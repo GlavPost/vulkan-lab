@@ -113,11 +113,6 @@ inline Mat4 rotateZ(float angle) {
 inline Mat4 orthographic(float left, float right,
                          float top, float bottom,
                          float near, float far) {
-    // x,y in [-1, 1]
-    // z   in [ 0, 1]
-    //
-    // направлен вниз, поэтому здесь используется именно
-    // (bottom - top)
     Mat4 result{};
 
     result.m[0][0] = 2.0f / (right - left);
@@ -135,11 +130,6 @@ inline Mat4 orthographic(float left, float right,
 
 inline Mat4 perspective(float fovYRadians, float aspect,
                         float near, float far) {
-    // [ 1/(aspect*tan(fov/2))       0          0             0 ]
-    // [          0             1/tan(fov/2)    0             0 ]
-    // [          0                  0       f/(f-n)   -fn/(f-n)]
-    // [          0                  0          1             0 ]
-
     Mat4 result{};
 
     const float tanHalfFov = std::tan(fovYRadians * 0.5f);
@@ -159,6 +149,73 @@ inline void toColumnMajor(const Mat4& matrix, float out[16]) {
             out[column * 4 + row] = matrix.m[row][column];
         }
     }
+}
+
+inline Vec3 sub(const Vec3& a, const Vec3& b) {
+    return {a.x - b.x, a.y - b.y, a.z - b.z};
+}
+
+inline float dot(const Vec3& a, const Vec3& b) {
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+inline Vec3 cross(const Vec3& a, const Vec3& b) {
+    return {
+        a.y * b.z - a.z * b.y,
+        a.z * b.x - a.x * b.z,
+        a.x * b.y - a.y * b.x,
+    };
+}
+
+inline float length(const Vec3& v) {
+    return std::sqrt(dot(v, v));
+}
+
+inline Vec3 normalize(const Vec3& v) {
+    const float len = length(v);
+    if (len < 1e-8f) {
+        return {0.0f, 0.0f, 0.0f};
+    }
+    return scale(v, 1.0f / len);
+}
+
+inline Mat4 transpose(const Mat4& a) {
+    Mat4 result{};
+
+    for (int row = 0; row < 4; ++row) {
+        for (int column = 0; column < 4; ++column) {
+            result.m[row][column] = a.m[column][row];
+        }
+    }
+
+    return result;
+}
+
+inline Vec3 transformDirection(const Mat4& a, const Vec3& v) {
+    return {
+        a.m[0][0] * v.x + a.m[0][1] * v.y + a.m[0][2] * v.z,
+        a.m[1][0] * v.x + a.m[1][1] * v.y + a.m[1][2] * v.z,
+        a.m[2][0] * v.x + a.m[2][1] * v.y + a.m[2][2] * v.z,
+    };
+}
+
+inline Mat4 cameraRotation(float yaw, float pitch, float roll) {
+    return multiply(rotateY(yaw), multiply(rotateX(pitch), rotateZ(roll)));
+}
+
+inline Mat4 viewMatrix(const Vec3& position, float yaw, float pitch, float roll) {
+    const Mat4 rotation = cameraRotation(yaw, pitch, roll);
+    const Mat4 inverseRotation = transpose(rotation);                // R_c^T
+    const Mat4 inverseTranslation = translate(scale(position, -1.0f)); // T(-c)
+    return multiply(inverseRotation, inverseTranslation);
+}
+
+inline Vec3 directionFromYawPitch(float yaw, float pitch) {
+    return {
+        std::sin(yaw) * std::cos(pitch),
+        -std::sin(pitch),
+        std::cos(yaw) * std::cos(pitch),
+    };
 }
 
 } // namespace lab_math
